@@ -169,6 +169,47 @@ class VideoComposeServiceTests {
     }
 
     @Test
+    void collectVideoUrlsPrefersManagedLocalUrlOverRemoteVideoUrl() throws Throwable {
+        when(storyboardService.listScenesByEpisode(11L)).thenReturn(List.of(
+                com.stonewu.fusion.entity.storyboard.StoryboardScene.builder().id(101L).sortOrder(0).build()
+        ));
+        when(storyboardService.listItemsByScene(101L)).thenReturn(List.of(
+                com.stonewu.fusion.entity.storyboard.StoryboardItem.builder()
+                        .id(201L).sortOrder(0)
+                        .videoUrl("https://ark-content-generation-cn-beijing.tos-cn-beijing.volces.com/x.mp4?X-Tos-Expires=86400")
+                        .generatedVideoUrl("/media/videos/local.mp4")
+                        .build()
+        ));
+
+        Method method = VideoComposeService.class.getDeclaredMethod("collectVideoUrls", Long.class);
+        method.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> urls = (List<String>) method.invoke(videoComposeService, 11L);
+
+        assertThat(urls).containsExactly("/media/videos/local.mp4");
+    }
+
+    @Test
+    void collectVideoUrlsFallsBackToRemoteWhenNoManagedUrl() throws Throwable {
+        when(storyboardService.listScenesByEpisode(11L)).thenReturn(List.of(
+                com.stonewu.fusion.entity.storyboard.StoryboardScene.builder().id(101L).sortOrder(0).build()
+        ));
+        when(storyboardService.listItemsByScene(101L)).thenReturn(List.of(
+                com.stonewu.fusion.entity.storyboard.StoryboardItem.builder()
+                        .id(201L).sortOrder(0)
+                        .videoUrl("https://example.com/remote.mp4")
+                        .build()
+        ));
+
+        Method method = VideoComposeService.class.getDeclaredMethod("collectVideoUrls", Long.class);
+        method.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> urls = (List<String>) method.invoke(videoComposeService, 11L);
+
+        assertThat(urls).containsExactly("https://example.com/remote.mp4");
+    }
+
+    @Test
     void resolveErrorMessageReturnsReadableHintWhenFfmpegExecutableMissing() throws Throwable {
         ReflectionTestUtils.setField(videoComposeService, "ffmpegPath", "C:/ffmpeg/bin/ffmpeg.exe");
 

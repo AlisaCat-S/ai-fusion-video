@@ -251,15 +251,34 @@ public class VideoComposeService {
             List<StoryboardItem> items = new ArrayList<>(storyboardService.listItemsByScene(scene.getId()));
             items.sort(Comparator.comparing(i -> Optional.ofNullable(i.getSortOrder()).orElse(0)));
             for (StoryboardItem item : items) {
-                String url = StringUtils.hasText(item.getVideoUrl())
-                        ? item.getVideoUrl()
-                        : item.getGeneratedVideoUrl();
+                String url = pickBestVideoUrl(item);
                 if (StringUtils.hasText(url)) {
                     urls.add(url);
                 }
             }
         }
         return urls;
+    }
+
+    /**
+     * 选择合成所用的镜头视频地址。
+     * 优先使用已持久化到本地/对象存储的 {@code /media/} 地址，
+     * 避免使用第三方平台返回的签名直链（如火山 TOS），这类链接会过期导致下载 403。
+     */
+    private String pickBestVideoUrl(StoryboardItem item) {
+        String videoUrl = item.getVideoUrl();
+        String generatedUrl = item.getGeneratedVideoUrl();
+        if (isManagedMediaUrl(videoUrl)) {
+            return videoUrl;
+        }
+        if (isManagedMediaUrl(generatedUrl)) {
+            return generatedUrl;
+        }
+        return StringUtils.hasText(videoUrl) ? videoUrl : generatedUrl;
+    }
+
+    private boolean isManagedMediaUrl(String url) {
+        return StringUtils.hasText(url) && url.startsWith(LOCAL_MEDIA_PUBLIC_PREFIX);
     }
 
     private boolean runFfmpegConcatDemuxer(Path listFile, Path output) throws Exception {
