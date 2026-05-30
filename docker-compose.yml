@@ -37,10 +37,11 @@ services:
 
   # ---------- 后端 ----------
   backend:
-    image: stonewuu/ai-fusion-video:latest
+    image: ghcr.io/stonewuu/ai-fusion-video:latest
     container_name: fusion-backend
     restart: unless-stopped
     environment:
+      TZ: Asia/Shanghai
       SPRING_PROFILES_ACTIVE: docker
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
@@ -62,7 +63,7 @@ services:
 
   # ---------- 前端 ----------
   frontend:
-    image: stonewuu/ai-fusion-video-web:latest
+    image: ghcr.io/stonewuu/ai-fusion-video-web:latest
     container_name: fusion-frontend
     restart: unless-stopped
     environment:

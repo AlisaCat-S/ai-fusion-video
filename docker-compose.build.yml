@@ -44,6 +44,7 @@ services:
     container_name: fusion-backend
     restart: unless-stopped
     environment:
+      TZ: Asia/Shanghai
       SPRING_PROFILES_ACTIVE: docker
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
