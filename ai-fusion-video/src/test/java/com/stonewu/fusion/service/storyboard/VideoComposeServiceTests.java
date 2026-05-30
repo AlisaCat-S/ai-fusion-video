@@ -169,7 +169,7 @@ class VideoComposeServiceTests {
     }
 
     @Test
-    void collectVideoUrlsPrefersManagedLocalUrlOverRemoteVideoUrl() throws Throwable {
+    void collectShotsPrefersManagedLocalUrlOverRemoteVideoUrl() throws Throwable {
         when(storyboardService.listScenesByEpisode(11L)).thenReturn(List.of(
                 com.stonewu.fusion.entity.storyboard.StoryboardScene.builder().id(101L).sortOrder(0).build()
         ));
@@ -181,16 +181,13 @@ class VideoComposeServiceTests {
                         .build()
         ));
 
-        Method method = VideoComposeService.class.getDeclaredMethod("collectVideoUrls", Long.class);
-        method.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        List<String> urls = (List<String>) method.invoke(videoComposeService, 11L);
+        List<String> urls = invokeCollectShotUrls(11L);
 
         assertThat(urls).containsExactly("/media/videos/local.mp4");
     }
 
     @Test
-    void collectVideoUrlsFallsBackToRemoteWhenNoManagedUrl() throws Throwable {
+    void collectShotsFallsBackToRemoteWhenNoManagedUrl() throws Throwable {
         when(storyboardService.listScenesByEpisode(11L)).thenReturn(List.of(
                 com.stonewu.fusion.entity.storyboard.StoryboardScene.builder().id(101L).sortOrder(0).build()
         ));
@@ -201,12 +198,58 @@ class VideoComposeServiceTests {
                         .build()
         ));
 
-        Method method = VideoComposeService.class.getDeclaredMethod("collectVideoUrls", Long.class);
-        method.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        List<String> urls = (List<String>) method.invoke(videoComposeService, 11L);
+        List<String> urls = invokeCollectShotUrls(11L);
 
         assertThat(urls).containsExactly("https://example.com/remote.mp4");
+    }
+
+    @Test
+    void buildCompleteMessageReportsSkippedShots() throws Throwable {
+        Method method = VideoComposeService.class.getDeclaredMethod(
+                "buildCompleteMessage", String.class, int.class, int.class, List.class, List.class);
+        method.setAccessible(true);
+
+        String message = (String) method.invoke(
+                videoComposeService,
+                "/media/videos/composed/ep.mp4", 34, 44,
+                List.of("#13", "#14"),
+                List.of("#4"));
+
+        assertThat(message)
+                .contains("已合成 34/44 个镜头")
+                .contains("镜头 #4 视频已失效被跳过，请重新生成后再合成")
+                .contains("镜头 #13、#14 尚未生成视频被跳过")
+                .contains("/media/videos/composed/ep.mp4");
+    }
+
+    @Test
+    void buildCompleteMessagePlainWhenNothingSkipped() throws Throwable {
+        Method method = VideoComposeService.class.getDeclaredMethod(
+                "buildCompleteMessage", String.class, int.class, int.class, List.class, List.class);
+        method.setAccessible(true);
+
+        String message = (String) method.invoke(
+                videoComposeService,
+                "/media/videos/composed/ep.mp4", 10, 10,
+                List.<String>of(),
+                List.<String>of());
+
+        assertThat(message)
+                .isEqualTo("✓ 合成完成 · 视频地址：/media/videos/composed/ep.mp4");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> invokeCollectShotUrls(Long episodeId) throws Throwable {
+        Method method = VideoComposeService.class.getDeclaredMethod("collectShots", Long.class);
+        method.setAccessible(true);
+        List<?> shots = (List<?>) method.invoke(videoComposeService, episodeId);
+        List<String> urls = new java.util.ArrayList<>();
+        for (Object shot : shots) {
+            Method urlMethod = shot.getClass().getDeclaredMethod("url");
+            urlMethod.setAccessible(true);
+            urls.add((String) urlMethod.invoke(shot));
+        }
+        return urls;
     }
 
     @Test

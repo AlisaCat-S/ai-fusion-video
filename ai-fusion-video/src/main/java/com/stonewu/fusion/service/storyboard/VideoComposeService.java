@@ -125,8 +125,9 @@ public class VideoComposeService {
                 TASK_INITIAL_MESSAGE
         );
 
-        List<String> videoUrls = collectVideoUrls(episodeId);
-        if (videoUrls.isEmpty()) {
+        List<ComposeShot> shots = collectShots(episodeId);
+        long withVideo = shots.stream().filter(ComposeShot::hasVideo).count();
+        if (withVideo == 0) {
             String message = "本集没有可合成的视频，请先生成镜头视频";
             markFailed(episodeId, message);
             taskStreamService.fail(taskId, message);
@@ -148,7 +149,7 @@ public class VideoComposeService {
         try {
             videoComposeExecutor.execute(() -> {
                 try {
-                    doCompose(episodeId, taskId, videoUrls);
+                    doCompose(episodeId, taskId, shots);
                 } catch (Throwable t) {
                     String errorMessage = resolveErrorMessage(t);
                     log.error("[VideoCompose] 合成失败: episodeId={}", episodeId, t);
@@ -164,18 +165,35 @@ public class VideoComposeService {
         return taskId;
     }
 
-    private void doCompose(Long episodeId, String taskId, List<String> videoUrls) throws Exception {
+    private void doCompose(Long episodeId, String taskId, List<ComposeShot> shots) throws Exception {
         log.info("[VideoCompose] 开始合成 episodeId={}, taskId={}", episodeId, taskId);
         long startMs = System.currentTimeMillis();
-        log.info("[VideoCompose] episodeId={}, 待合成视频数={}", episodeId, videoUrls.size());
+        log.info("[VideoCompose] episodeId={}, 镜头总数={}", episodeId, shots.size());
 
         Path workDir = Files.createTempDirectory("compose_ep_" + episodeId + "_");
         try {
             List<Path> localFiles = new ArrayList<>();
-            for (int i = 0; i < videoUrls.size(); i++) {
-                Path local = workDir.resolve(String.format("v%04d.mp4", i));
-                downloadToFile(videoUrls.get(i), local);
-                localFiles.add(local);
+            List<String> missingShots = new ArrayList<>();
+            List<String> failedShots = new ArrayList<>();
+
+            int index = 0;
+            for (ComposeShot shot : shots) {
+                if (!shot.hasVideo()) {
+                    missingShots.add(shot.label());
+                    continue;
+                }
+                Path local = workDir.resolve(String.format("v%04d.mp4", index++));
+                try {
+                    downloadToFile(shot.url(), local);
+                    localFiles.add(local);
+                } catch (Exception e) {
+                    failedShots.add(shot.label());
+                    log.warn("[VideoCompose] 镜头 {} 视频下载失败，已跳过: {}", shot.label(), e.getMessage());
+                }
+            }
+
+            if (localFiles.isEmpty()) {
+                throw new RuntimeException("所有镜头视频均无法获取，合成中止");
             }
 
             Path listFile = workDir.resolve("list.txt");
@@ -207,10 +225,12 @@ public class VideoComposeService {
             update.setComposeErrorMsg(null);
             episodeMapper.updateById(update);
 
-                taskStreamService.complete(taskId, "✓ 合成完成 · 视频地址：" + storedUrl);
+            taskStreamService.complete(taskId,
+                    buildCompleteMessage(storedUrl, localFiles.size(), shots.size(), missingShots, failedShots));
 
-            log.info("[VideoCompose] 完成 episodeId={}, 耗时={}ms, 视频数={}",
-                    episodeId, System.currentTimeMillis() - startMs, videoUrls.size());
+            log.info("[VideoCompose] 完成 episodeId={}, 耗时={}ms, 合成镜头数={}/{}, 跳过(未生成={}, 失败={})",
+                    episodeId, System.currentTimeMillis() - startMs, localFiles.size(), shots.size(),
+                    missingShots.size(), failedShots.size());
         } finally {
             try {
                 FileSystemUtils.deleteRecursively(workDir.toFile());
@@ -218,6 +238,29 @@ public class VideoComposeService {
                 log.warn("[VideoCompose] 临时目录清理失败 {}", workDir, e);
             }
         }
+    }
+
+    /**
+     * 构建合成完成提示。
+     * 全部镜头都合入时仅提示成功；存在跳过镜头时明确列出未生成 / 已失效的镜号。
+     */
+    private String buildCompleteMessage(String storedUrl, int composed, int total,
+                                        List<String> missingShots, List<String> failedShots) {
+        if (missingShots.isEmpty() && failedShots.isEmpty()) {
+            return "✓ 合成完成 · 视频地址：" + storedUrl;
+        }
+        StringBuilder msg = new StringBuilder();
+        msg.append("✓ 已合成 ").append(composed).append("/").append(total).append(" 个镜头");
+        if (!failedShots.isEmpty()) {
+            msg.append("，镜头 ").append(String.join("、", failedShots))
+               .append(" 视频已失效被跳过，请重新生成后再合成");
+        }
+        if (!missingShots.isEmpty()) {
+            msg.append("，镜头 ").append(String.join("、", missingShots))
+               .append(" 尚未生成视频被跳过");
+        }
+        msg.append(" · 视频地址：").append(storedUrl);
+        return msg.toString();
     }
 
     private String buildTaskTitle(StoryboardEpisode episode) {
@@ -242,22 +285,29 @@ public class VideoComposeService {
         return "合成失败";
     }
 
-    private List<String> collectVideoUrls(Long episodeId) {
+    private List<ComposeShot> collectShots(Long episodeId) {
         List<StoryboardScene> scenes = new ArrayList<>(storyboardService.listScenesByEpisode(episodeId));
         scenes.sort(Comparator.comparing(s -> Optional.ofNullable(s.getSortOrder()).orElse(0)));
 
-        List<String> urls = new ArrayList<>();
+        List<ComposeShot> shots = new ArrayList<>();
         for (StoryboardScene scene : scenes) {
             List<StoryboardItem> items = new ArrayList<>(storyboardService.listItemsByScene(scene.getId()));
             items.sort(Comparator.comparing(i -> Optional.ofNullable(i.getSortOrder()).orElse(0)));
             for (StoryboardItem item : items) {
-                String url = pickBestVideoUrl(item);
-                if (StringUtils.hasText(url)) {
-                    urls.add(url);
-                }
+                shots.add(new ComposeShot(buildShotLabel(item), pickBestVideoUrl(item)));
             }
         }
-        return urls;
+        return shots;
+    }
+
+    private String buildShotLabel(StoryboardItem item) {
+        if (StringUtils.hasText(item.getShotNumber())) {
+            return "#" + item.getShotNumber().trim();
+        }
+        if (StringUtils.hasText(item.getAutoShotNumber())) {
+            return "#" + item.getAutoShotNumber().trim();
+        }
+        return "#" + item.getId();
     }
 
     /**
@@ -279,6 +329,13 @@ public class VideoComposeService {
 
     private boolean isManagedMediaUrl(String url) {
         return StringUtils.hasText(url) && url.startsWith(LOCAL_MEDIA_PUBLIC_PREFIX);
+    }
+
+    /** 单个待合成镜头：标签（镜号）与视频地址（可能为空，表示未生成视频）。 */
+    record ComposeShot(String label, String url) {
+        boolean hasVideo() {
+            return StringUtils.hasText(url);
+        }
     }
 
     private boolean runFfmpegConcatDemuxer(Path listFile, Path output) throws Exception {
