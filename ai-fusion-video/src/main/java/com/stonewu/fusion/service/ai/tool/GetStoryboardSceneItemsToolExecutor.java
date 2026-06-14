@@ -48,7 +48,7 @@ public class GetStoryboardSceneItemsToolExecutor implements ToolExecutor {
                 1. 通过 sceneId 直接查询场次下的所有镜头
                 2. 通过 storyboardItemId 查询该镜头所在场次的所有镜头（自动定位场次）
 
-                返回的每个镜头包含完整信息：画面内容、景别、运镜、对白、音效、图片URL、视频URL等。
+                返回的每个镜头包含完整信息：画面内容、景别、运镜、对白、音效、首尾帧图片URL、视频URL等。
                 可用于获取上下文信息（上一个/下一个镜头），以便生成连贯的视频提示词。
 
                 **资产引用解析**：每个镜头的 characterIds、propIds、sceneAssetItemId 会自动解析为带图片URL的资产引用信息，
@@ -141,6 +141,10 @@ public class GetStoryboardSceneItemsToolExecutor implements ToolExecutor {
                         .set("transition", item.getTransition())
                         .set("imageUrl", item.getImageUrl())
                         .set("generatedImageUrl", item.getGeneratedImageUrl())
+                        .set("firstFrameImageUrl", item.getFirstFrameImageUrl())
+                        .set("lastFrameImageUrl", item.getLastFrameImageUrl())
+                        .set("firstFramePrompt", item.getFirstFramePrompt())
+                        .set("lastFramePrompt", item.getLastFramePrompt())
                         .set("videoUrl", item.getVideoUrl())
                         .set("generatedVideoUrl", item.getGeneratedVideoUrl())
                         .set("videoPrompt", item.getVideoPrompt())

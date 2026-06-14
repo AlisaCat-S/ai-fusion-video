@@ -44,6 +44,7 @@ const TOOL_INVALIDATION_MAP: Record<string, InvalidationType> = {
   save_storyboard_scene_shots: "storyboards",
   insert_storyboard_item: "storyboards",
   update_storyboard_item_video: "storyboards",
+  update_storyboard_item_frame: "storyboards",
   generate_video: "storyboards",
 };
 

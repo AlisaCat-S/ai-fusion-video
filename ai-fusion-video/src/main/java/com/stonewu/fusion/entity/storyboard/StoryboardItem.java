@@ -60,6 +60,18 @@ public class StoryboardItem extends BaseEntity {
     /** AI生成的图片URL */
     private String generatedImageUrl;
 
+    /** 首帧参考图片URL */
+    private String firstFrameImageUrl;
+
+    /** 尾帧参考图片URL */
+    private String lastFrameImageUrl;
+
+    /** AI生成首帧时使用的提示词 */
+    private String firstFramePrompt;
+
+    /** AI生成尾帧时使用的提示词 */
+    private String lastFramePrompt;
+
     /** AI生成的视频URL */
     private String generatedVideoUrl;
 

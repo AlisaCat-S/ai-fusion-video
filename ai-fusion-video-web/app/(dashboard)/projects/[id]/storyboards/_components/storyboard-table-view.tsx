@@ -1,10 +1,10 @@
 "use client";
 
-import { Film, GripVertical, Plus, Trash2, ImageIcon, Video, Play, ZoomIn, X, User, MapPin, Package } from "lucide-react";
+import { Film, GripVertical, Plus, Trash2, Video, Play, ZoomIn, X } from "lucide-react";
 import { VideoPreviewDialog } from "@/components/dashboard/video-preview-dialog";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/api/client";
-import type { StoryboardItem } from "@/lib/api/storyboard";
+import type { StoryboardFrameType, StoryboardItem } from "@/lib/api/storyboard";
 import { EditableCell } from "./editable-cell";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -42,6 +42,7 @@ function getAssetDisplayName(subItemName: string | null | undefined, parentAsset
 type StoryboardTableField =
   | "shotNumber"
   | "imageUrl"
+  | "frameReferences"
   | "generatedVideoUrl"
   | "videoPrompt"
   | "shotType"
@@ -67,6 +68,7 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { label: "镜号", field: "shotNumber", initW: 48, minW: 40 },
   { label: "画面", field: "imageUrl", initW: 80, minW: 60, isImage: true },
+  { label: "首尾帧", field: "frameReferences", initW: 92, minW: 82 },
   { label: "视频", field: "generatedVideoUrl", initW: 80, minW: 60, isVideo: true },
   { label: "视频提示词", field: "videoPrompt", initW: 200, minW: 80, multiline: true },
   { label: "关联资产", field: "assets", initW: 160, minW: 100 },
@@ -127,17 +129,19 @@ export function StoryboardTableView({
   onDeleteItem,
   onReorderItems,
   onVideoGen,
+  onOpenFrameDialog,
   assetLookup = {},
   onEditAssets,
 }: {
   items: StoryboardItem[];
   selectedItemId: number | null;
   onSelectItem: (id: number | null) => void;
-  onUpdateItemField: (itemId: number, field: string, value: string) => void;
+  onUpdateItemField: (itemId: number, field: string, value: string | number | null) => void;
   onAddItem: () => void;
   onDeleteItem: (id: number) => void;
   onReorderItems?: (reorderedItems: StoryboardItem[]) => void;
   onVideoGen?: (itemId: number) => void;
+  onOpenFrameDialog?: (item: StoryboardItem, frameType: StoryboardFrameType) => void;
   assetLookup?: Record<
     number,
     {
@@ -378,36 +382,78 @@ export function StoryboardTableView({
                 </div>
 
                 {/* 数据列 */}
-                {COLUMNS.map((col) => (
-                  <div
-                    key={col.field}
-                    className="px-2 py-2 flex items-center justify-center min-w-0 break-all"
-                  >
-                    {col.isImage ? (
+                {COLUMNS.map((col) => {
+                  const framePreviewUrl = item.firstFrameImageUrl || item.generatedImageUrl || item.imageUrl || item.referenceImageUrl;
+                  return (
+                    <div
+                      key={col.field}
+                      className="px-2 py-2 flex items-center justify-center min-w-0 break-all"
+                    >
+                      {col.isImage ? (
                       <div
                         onClick={(e) => {
-                          if (item.imageUrl) {
+                          if (framePreviewUrl) {
                             e.stopPropagation();
-                            setPreviewImageUrl(item.imageUrl);
+                            setPreviewImageUrl(framePreviewUrl);
                             setPreviewImageTitle(`镜头 #${item.shotNumber || item.autoShotNumber || ""} 画面`);
                           }
                         }}
                         className={cn(
                           "flex items-center justify-center h-11 w-16 rounded-md bg-muted/20 border border-border/10 overflow-hidden shrink-0 relative group/img",
-                          item.imageUrl && "cursor-zoom-in hover:border-primary/40 transition-colors"
+                          framePreviewUrl && "cursor-zoom-in hover:border-primary/40 transition-colors"
                         )}
                       >
                         <SafeImage
-                          src={resolveMediaUrl(item.imageUrl)}
+                          src={resolveMediaUrl(framePreviewUrl)}
                           alt="画面"
                           fallbackType="image"
                           className="w-full h-full object-cover transition-transform group-hover/img:scale-105"
                         />
-                        {item.imageUrl && (
+                        {framePreviewUrl && (
                           <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all pointer-events-none">
                             <ZoomIn className="h-3.5 w-3.5 text-white/90" />
                           </div>
                         )}
+                      </div>
+                    ) : col.field === "frameReferences" ? (
+                      <div className="flex items-center justify-center gap-1">
+                        {(["first", "last"] as StoryboardFrameType[]).map((frameType) => {
+                          const label = frameType === "first" ? "首" : "尾";
+                          const title = frameType === "first" ? "首帧参考图" : "尾帧参考图";
+                          const hasFrame =
+                            frameType === "first"
+                              ? !!item.firstFrameImageUrl
+                              : !!item.lastFrameImageUrl;
+                          return (
+                            <Tooltip key={frameType}>
+                              <TooltipTrigger
+                                render={
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onSelectItem(item.id);
+                                      onOpenFrameDialog?.(item, frameType);
+                                    }}
+                                    disabled={!onOpenFrameDialog}
+                                    className={cn(
+                                      "h-7 w-8 rounded-md border text-[10px] font-semibold transition-all",
+                                      "flex items-center justify-center disabled:opacity-45 disabled:cursor-not-allowed",
+                                      hasFrame
+                                        ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        : "border-border/30 bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5"
+                                    )}
+                                  >
+                                    {label}
+                                  </button>
+                                }
+                              />
+                              <TooltipContent className={TOOLTIP_CONTENT_CLASS}>
+                                {title}：{hasFrame ? "已设置" : "未设置"}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
                       </div>
                     ) : col.isVideo ? (
                       <div className="flex items-center justify-center h-11 w-16 rounded-md bg-muted/20 border border-border/10 overflow-hidden shrink-0 relative group/video">
@@ -643,14 +689,15 @@ export function StoryboardTableView({
                         )}
                         multiline={col.multiline}
                       />
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
 
                 {/* 操作按钮 */}
                 <div className="px-1 py-2 flex items-center justify-center gap-0.5">
-                  {/* 生成视频 - 需要有画面 */}
-                  {(item.imageUrl || item.generatedImageUrl) && onVideoGen && (
+                  {/* 生成视频 */}
+                  {onVideoGen && (
                     <Tooltip>
                       <TooltipTrigger
                         render={

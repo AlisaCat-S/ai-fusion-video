@@ -31,10 +31,12 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { SafeImage } from "@/components/ui/safe-image";
 
 import type { Asset, AssetItem } from "@/lib/api/asset";
-import type { StoryboardItem, Storyboard, StoryboardScene } from "@/lib/api/storyboard";
+import type { Project } from "@/lib/api/project";
+import type { StoryboardItem, Storyboard, StoryboardFrameType, StoryboardScene } from "@/lib/api/storyboard";
 import { BatchGenDialog } from "./batch-gen-dialog";
 import type { AssetItemWithInfo, SelectedAssetItem } from "./batch-gen-dialog";
 import { VideoGenDialog } from "./video-gen-dialog";
+import { FrameReferenceSection } from "./storyboard-frame-reference-dialog";
 import { usePipelineStore } from "@/lib/store/pipeline-store";
 
 // ========== 类型 ==========
@@ -480,14 +482,20 @@ function AssetItemGroup({
 function ItemDetail({
   item,
   projectId,
+  project,
   assetLookup,
   onEditAssets,
+  onUpdateFrame,
+  onGenerateFrame,
   onPreviewImage,
 }: {
   item: StoryboardItem;
   projectId: number;
+  project?: Project | null;
   assetLookup?: Record<number, { item: AssetItem; asset: Asset }>;
   onEditAssets?: () => void;
+  onUpdateFrame?: (itemId: number, frameType: StoryboardFrameType, imageUrl: string | null) => Promise<void> | void;
+  onGenerateFrame?: (item: StoryboardItem, frameType: StoryboardFrameType, prompt: string) => Promise<void> | void;
   onPreviewImage?: (url: string, title: string) => void;
 }) {
   const router = useRouter();
@@ -650,6 +658,28 @@ function ItemDetail({
           <Info className="h-3 w-3" /> 镜头详情
         </h4>
       </div>
+
+      <FrameReferenceSection
+        item={item}
+        project={project}
+        frameType="first"
+        imageUrl={item.firstFrameImageUrl}
+        prompt={item.firstFramePrompt}
+        onUpdateFrame={onUpdateFrame}
+        onGenerateFrame={onGenerateFrame}
+        onPreviewImage={onPreviewImage}
+      />
+
+      <FrameReferenceSection
+        item={item}
+        project={project}
+        frameType="last"
+        imageUrl={item.lastFrameImageUrl}
+        prompt={item.lastFramePrompt}
+        onUpdateFrame={onUpdateFrame}
+        onGenerateFrame={onGenerateFrame}
+        onPreviewImage={onPreviewImage}
+      />
 
       {/* 预览图 */}
       {(item.imageUrl ||
@@ -981,7 +1011,7 @@ function StoryboardOverview({
     0
   );
   const withImage = items.filter(
-    (i) => i.imageUrl || i.generatedImageUrl || i.referenceImageUrl
+    (i) => i.firstFrameImageUrl || i.lastFrameImageUrl || i.imageUrl || i.generatedImageUrl || i.referenceImageUrl
   ).length;
 
   return (
@@ -1040,18 +1070,22 @@ export function StoryboardRefPanel({
   selectedItem,
   activeSceneGroup,
   projectId,
+  project,
   assetLookup,
+  onUpdateFrame,
+  onGenerateFrame,
   onEditAssets,
-  hideShotDetails = false,
 }: {
   storyboard: Storyboard;
   items: StoryboardItem[];
   selectedItem: StoryboardItem | null;
   activeSceneGroup?: SceneWithItems | null;
   projectId: number;
+  project?: Project | null;
   assetLookup?: Record<number, { item: AssetItem; asset: Asset }>;
+  onUpdateFrame?: (itemId: number, frameType: StoryboardFrameType, imageUrl: string | null) => Promise<void> | void;
+  onGenerateFrame?: (item: StoryboardItem, frameType: StoryboardFrameType, prompt: string) => Promise<void> | void;
   onEditAssets?: (item: StoryboardItem) => void;
-  hideShotDetails?: boolean;
 }) {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageTitle, setPreviewImageTitle] = useState<string>("");
@@ -1061,7 +1095,7 @@ export function StoryboardRefPanel({
     setPreviewImageTitle(title);
   }, []);
 
-  const showShot = selectedItem && !hideShotDetails;
+  const showShot = selectedItem;
 
   return (
     <div className="w-full lg:w-72 border-l border-border/20 flex flex-col shrink-0 bg-card/20 overflow-y-auto h-full relative">
@@ -1070,7 +1104,10 @@ export function StoryboardRefPanel({
           <ItemDetail
             item={selectedItem}
             projectId={projectId}
+            project={project}
             assetLookup={assetLookup}
+            onUpdateFrame={onUpdateFrame}
+            onGenerateFrame={onGenerateFrame}
             onEditAssets={() => onEditAssets?.(selectedItem)}
             onPreviewImage={handlePreviewImage}
           />

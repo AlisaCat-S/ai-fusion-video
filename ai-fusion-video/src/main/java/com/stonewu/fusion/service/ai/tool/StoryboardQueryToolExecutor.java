@@ -86,6 +86,10 @@ public class StoryboardQueryToolExecutor implements ToolExecutor {
                         .set("transition", item.getTransition())
                         .set("imageUrl", item.getImageUrl())
                         .set("generatedImageUrl", item.getGeneratedImageUrl())
+                        .set("firstFrameImageUrl", item.getFirstFrameImageUrl())
+                        .set("lastFrameImageUrl", item.getLastFrameImageUrl())
+                        .set("firstFramePrompt", item.getFirstFramePrompt())
+                        .set("lastFramePrompt", item.getLastFramePrompt())
                         .set("videoUrl", item.getVideoUrl())
                         .set("generatedVideoUrl", item.getGeneratedVideoUrl())
                         .set("videoPrompt", item.getVideoPrompt()));

@@ -32,6 +32,14 @@ public class StoryboardItemCreateReqVO {
 
     private String generatedImageUrl;
 
+    private String firstFrameImageUrl;
+
+    private String lastFrameImageUrl;
+
+    private String firstFramePrompt;
+
+    private String lastFramePrompt;
+
     private String generatedVideoUrl;
 
     private String videoPrompt;

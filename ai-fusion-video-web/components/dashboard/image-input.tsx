@@ -13,8 +13,12 @@ interface ImageInputProps {
   className?: string;
   /** 预览区高度 class，默认 h-32 */
   previewHeight?: string;
+  previewContainerClassName?: string;
+  previewImageClassName?: string;
+  onPreviewClick?: () => void;
   placeholder?: string;
   uploadSubDir?: string;
+  beforeUpload?: () => boolean;
 }
 
 /**
@@ -25,8 +29,12 @@ export default function ImageInput({
   onChange,
   className,
   previewHeight = "h-32",
+  previewContainerClassName,
+  previewImageClassName,
+  onPreviewClick,
   placeholder = "粘贴图片链接...",
   uploadSubDir = "images",
+  beforeUpload,
 }: ImageInputProps) {
   const [mode, setMode] = useState<"url" | "upload">("upload");
   const [uploading, setUploading] = useState(false);
@@ -51,6 +59,7 @@ export default function ImageInput({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    if (beforeUpload && !beforeUpload()) return;
     void handleUpload(file);
   };
 
@@ -58,12 +67,28 @@ export default function ImageInput({
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
+    if (beforeUpload && !beforeUpload()) return;
     void handleUpload(file);
   };
 
   const handleClear = () => {
     onChange("");
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const commitUrl = (rawUrl: string) => {
+    const nextUrl = rawUrl.trim();
+    if (nextUrl !== value) {
+      onChange(nextUrl);
+    }
+  };
+
+  const handlePreviewKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onPreviewClick) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onPreviewClick();
+    }
   };
 
   return (
@@ -100,12 +125,30 @@ export default function ImageInput({
 
       {/* 预览区 / 拖拽区 */}
       {value ? (
-        <div className={cn("relative rounded-lg overflow-hidden border border-border/20 bg-muted/10 group", previewHeight)}>
+        <div
+          className={cn(
+            "relative rounded-lg overflow-hidden border border-border/20 bg-muted/10 group",
+            onPreviewClick && "cursor-zoom-in",
+            previewHeight,
+            previewContainerClassName
+          )}
+          role={onPreviewClick ? "button" : undefined}
+          tabIndex={onPreviewClick ? 0 : undefined}
+          onClick={onPreviewClick}
+          onKeyDown={handlePreviewKeyDown}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={resolveMediaUrl(value) || ""} alt="preview" className="w-full h-full object-cover" />
+          <img
+            src={resolveMediaUrl(value) || ""}
+            alt="preview"
+            className={cn("w-full h-full", previewImageClassName || "object-cover")}
+          />
           <button
             type="button"
-            onClick={handleClear}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleClear();
+            }}
             className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/50 text-white/80 hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm"
           >
             <X className="h-3 w-3" />
@@ -154,8 +197,16 @@ export default function ImageInput({
       {/* URL 输入框 */}
       {mode === "url" && (
         <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          key={value || "empty-url"}
+          defaultValue={value}
+          onBlur={(e) => commitUrl(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitUrl(e.currentTarget.value);
+              e.currentTarget.blur();
+            }
+          }}
           placeholder={placeholder}
           className="h-7 text-xs"
         />

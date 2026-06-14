@@ -4,6 +4,7 @@ import com.stonewu.fusion.common.CommonResult;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardCreateReqVO;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardEpisodeCreateReqVO;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardEpisodeUpdateReqVO;
+import com.stonewu.fusion.controller.storyboard.vo.StoryboardFrameUpdateReqVO;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardItemCreateReqVO;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardItemSortReqVO;
 import com.stonewu.fusion.controller.storyboard.vo.StoryboardItemUpdateReqVO;
@@ -189,6 +190,25 @@ public class StoryboardController {
     public CommonResult<StoryboardItem> updateItem(@Valid @RequestBody StoryboardItemUpdateReqVO reqVO) {
         StoryboardItem item = StoryboardConvert.INSTANCE.convert(reqVO);
         return CommonResult.success(storyboardService.updateItem(item));
+    }
+
+    /**
+     * 更新分镜条目的首帧或尾帧参考图。
+     *
+     * @param id    分镜条目ID
+     * @param reqVO 首尾帧更新请求
+     * @return 更新后的分镜条目
+     */
+    @Operation(summary = "更新分镜条目首尾帧")
+    @PutMapping("/item/{id}/updateFrame")
+    public CommonResult<StoryboardItem> updateItemFrame(@PathVariable Long id,
+                                                       @Valid @RequestBody StoryboardFrameUpdateReqVO reqVO) {
+        return CommonResult.success(storyboardService.updateItemFrame(
+                id,
+                reqVO.getFrameType(),
+                reqVO.getImageUrl(),
+                reqVO.getPrompt()
+        ));
     }
 
     @Operation(summary = "删除分镜条目")

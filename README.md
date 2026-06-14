@@ -13,11 +13,15 @@
     <td align="center">
       <sub>⚡️ <b>特别赞助</b> ⚡️</sub>
       <br />
-      <a href="https://api.aiflow321.cn/register?aff=CNKv" target="_blank"><font size="4"><b>Lumina AI 中转站</b></font></a>
+      <a href="https://doloffer.com" target="_blank"><font size="4"><b>doloffer</b></font></a>
       <br />
-      <sub>Lumina 是一个企业级 API 中转平台，深度聚合 GPT、Claude、Gemini、Sora、Seedance 等全球主流大模型 API，平台提供极具竞争力的价格和企业级稳定性</sub>
       <br />
-      <sub>💬 客服微信：<b>haha2027456</b> | QQ：<b>2736504134</b>（报暗号<b>【融光】</b>享 VIP 分组价格）</sub>
+      <a href="https://doloffer.com" target="_blank">
+        <img width="539"  alt="image" src="https://github.com/user-attachments/assets/825cf226-0510-4c46-a9ad-a90d4de668b8" />
+      </a>
+      <br />
+      <sub>优惠价GPT  、claude、YouTube（含音乐）会员充值，正版订阅 售后无忧，https://doloffer.com 9折优惠码：AI8888 </sub>
+      <br />
     </td>
   </tr>
 </table>

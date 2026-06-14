@@ -53,7 +53,7 @@ export function VideoGenDialog({
 
   /** 获取镜头的画面 URL（优先使用生成的） */
   const getImageUrl = (item: StoryboardItem) => {
-    return item.generatedImageUrl || item.imageUrl || null;
+    return item.firstFrameImageUrl || item.generatedImageUrl || item.imageUrl || null;
   };
 
   /** 景别标签 */
@@ -122,7 +122,7 @@ export function VideoGenDialog({
             items.map((item) => {
               const checked = selected.has(item.id);
               const hasVideo = !!(item.videoUrl || item.generatedVideoUrl);
-              const hasImage = !!(item.imageUrl || item.generatedImageUrl);
+              const hasImage = !!(item.firstFrameImageUrl || item.imageUrl || item.generatedImageUrl);
               const imgUrl = getImageUrl(item);
 
               return (
@@ -184,7 +184,7 @@ export function VideoGenDialog({
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {hasImage && (
                         <span className="text-[10px] text-cyan-400/70">
-                          有画面
+                          有首帧
                         </span>
                       )}
                       {hasVideo && (

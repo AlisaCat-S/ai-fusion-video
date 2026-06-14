@@ -1,6 +1,7 @@
 package com.stonewu.fusion.service.storyboard;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.stonewu.fusion.common.BusinessException;
 import com.stonewu.fusion.entity.storyboard.Storyboard;
 import com.stonewu.fusion.entity.storyboard.StoryboardEpisode;
@@ -17,6 +18,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -197,6 +199,49 @@ public class StoryboardService {
         getItemById(item.getId());
         itemMapper.updateById(item);
         return itemMapper.selectById(item.getId());
+    }
+
+    /**
+     * 更新分镜条目的首帧或尾帧字段。
+     *
+     * @param itemId    分镜条目ID
+     * @param frameType 帧类型：first-首帧，last-尾帧
+     * @param imageUrl  图片URL，允许为空，空值表示清空对应帧
+     * @param prompt    AI生成提示词，允许为空，空值表示清空对应提示词
+     * @return 更新后的分镜条目
+     */
+    @CacheEvict(value = "storyboardItem", allEntries = true)
+    @Transactional
+    public StoryboardItem updateItemFrame(Long itemId, String frameType, String imageUrl, String prompt) {
+        getItemById(itemId);
+        String normalizedFrameType = normalizeFrameType(frameType);
+        String normalizedImageUrl = StringUtils.hasText(imageUrl) ? imageUrl.trim() : null;
+        String normalizedPrompt = StringUtils.hasText(prompt) ? prompt.trim() : null;
+        UpdateWrapper<StoryboardItem> wrapper = new UpdateWrapper<StoryboardItem>()
+                .eq("id", itemId);
+        if ("first".equals(normalizedFrameType)) {
+            wrapper.set("first_frame_image_url", normalizedImageUrl)
+                    .set("first_frame_prompt", normalizedPrompt);
+        } else {
+            wrapper.set("last_frame_image_url", normalizedImageUrl)
+                    .set("last_frame_prompt", normalizedPrompt);
+        }
+        itemMapper.update(null, wrapper);
+        return itemMapper.selectById(itemId);
+    }
+
+    /**
+     * 规范化帧类型。
+     *
+     * @param frameType 原始帧类型
+     * @return 规范化后的帧类型
+     */
+    public String normalizeFrameType(String frameType) {
+        String normalizedFrameType = StringUtils.hasText(frameType) ? frameType.trim() : "";
+        if ("first".equals(normalizedFrameType) || "last".equals(normalizedFrameType)) {
+            return normalizedFrameType;
+        }
+        throw new BusinessException("帧类型仅支持 first 或 last");
     }
 
     @CacheEvict(value = "storyboardItem", allEntries = true)

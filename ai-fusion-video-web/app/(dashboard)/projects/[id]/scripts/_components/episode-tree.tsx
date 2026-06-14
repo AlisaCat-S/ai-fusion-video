@@ -10,6 +10,8 @@ import {
   Trash2,
   GripVertical,
   Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -116,9 +118,11 @@ export function EpisodeTree({
   selectedSceneId,
   loadingEpisodes,
   episodeScenes,
+  collapsed = false,
   onToggleEpisode,
   onSelectEpisode,
   onSelectScene,
+  onCollapsedChange,
   onAddEpisode,
   onDeleteEpisode,
   onAddScene,
@@ -132,9 +136,11 @@ export function EpisodeTree({
   selectedSceneId: number | null;
   loadingEpisodes: Set<number>;
   episodeScenes: Record<number, SceneItem[]>;
+  collapsed?: boolean;
   onToggleEpisode: (id: number) => void;
   onSelectEpisode: (id: number) => void;
   onSelectScene: (sceneId: number, episodeId: number) => void;
+  onCollapsedChange?: (collapsed: boolean) => void;
   onAddEpisode: () => void;
   onDeleteEpisode: (id: number) => void;
   onAddScene: (episodeId: number) => void;
@@ -158,15 +164,47 @@ export function EpisodeTree({
     }
   };
 
+  if (collapsed) {
+    return (
+      <div className="w-12 border-r border-border/20 flex flex-col shrink-0 bg-card/20 h-full transition-[width] duration-200">
+        <div className="px-2 py-3 border-b border-primary/8 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onCollapsedChange?.(false)}
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/8 transition-colors"
+            title="展开剧本目录"
+            aria-label="展开剧本目录"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
+          <Film className="h-4 w-4 text-primary/70" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full lg:w-64 border-r border-border/20 flex flex-col shrink-0 bg-card/20 h-full">
+    <div className="w-full lg:w-64 border-r border-border/20 flex flex-col shrink-0 bg-card/20 h-full transition-[width] duration-200">
       <div className="px-4 py-3 border-b border-primary/8 flex items-center justify-between">
         <h3 className="text-xs font-semibold text-primary/80 uppercase tracking-wider">
           剧本目录
         </h3>
-        <span className="text-[10px] text-primary/50 bg-primary/6 px-1.5 py-0.5 rounded-full tabular-nums font-medium">
-          {episodes.length} 集
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-primary/50 bg-primary/6 px-1.5 py-0.5 rounded-full tabular-nums font-medium">
+            {episodes.length} 集
+          </span>
+          {onCollapsedChange && (
+            <button
+              type="button"
+              onClick={() => onCollapsedChange(true)}
+              className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground/70 hover:text-primary hover:bg-primary/8 transition-colors"
+              title="收起剧本目录"
+              aria-label="收起剧本目录"
+            >
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto py-1.5 px-1.5">
         {episodes.map((ep) => {

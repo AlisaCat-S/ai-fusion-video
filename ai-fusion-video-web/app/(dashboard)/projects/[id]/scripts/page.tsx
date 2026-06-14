@@ -21,6 +21,8 @@ import { EpisodeParseDialog } from "@/components/dashboard/episode-parse-dialog"
 import { usePipelineStore } from "@/lib/store/pipeline-store";
 import { useProject } from "../project-context";
 
+const SCRIPT_SIDEBAR_COLLAPSED_STORAGE_KEY = "fusion-script-sidebar-collapsed";
+
 export default function ScriptTabPage() {
   const params = useParams();
   const projectId = Number(params.id);
@@ -63,6 +65,10 @@ export default function ScriptTabPage() {
   // 移动端侧边栏状态
   const [leftSheetOpen, setLeftSheetOpen] = useState(false);
   const [rightSheetOpen, setRightSheetOpen] = useState(false);
+  const [isScriptSidebarCollapsed, setIsScriptSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(SCRIPT_SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  });
 
   // 分集解析弹窗
   const [showEpisodeParseDialog, setShowEpisodeParseDialog] = useState(false);
@@ -70,6 +76,14 @@ export default function ScriptTabPage() {
 
   // Pipeline store
   const { addPipeline, setPanelExpanded, setExpandedTaskId } = usePipelineStore();
+
+  const handleSetScriptSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setIsScriptSidebarCollapsed(collapsed);
+    localStorage.setItem(
+      SCRIPT_SIDEBAR_COLLAPSED_STORAGE_KEY,
+      collapsed ? "true" : "false"
+    );
+  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1280px)");
@@ -574,9 +588,11 @@ export default function ScriptTabPage() {
         selectedSceneId={selectedSceneId}
         loadingEpisodes={loadingEpisodes}
         episodeScenes={episodeScenes}
+        collapsed={isScriptSidebarCollapsed}
         onToggleEpisode={toggleEpisode}
         onSelectEpisode={selectEpisode}
         onSelectScene={handleSelectScene}
+        onCollapsedChange={handleSetScriptSidebarCollapsed}
         onAddEpisode={handleAddEpisode}
         onDeleteEpisode={handleDeleteEpisode}
         onAddScene={handleAddScene}

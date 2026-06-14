@@ -60,6 +60,8 @@ public class AiAgentRegistry {
                 registerStoryboardAssetPreprocessorAgent();
                 registerAssetImageGenerationAgent();
                 registerAssetImageExecutorAgent();
+                registerStoryboardFrameGenAgent();
+                registerStoryboardFrameExecutorAgent();
                 registerStoryboardVideoGenAgent();
                 registerStoryboardVideoExecutorAgent();
         }
@@ -474,6 +476,71 @@ public class AiAgentRegistry {
                                                 "get_project", "query_asset_items", "get_generation_model_capabilities", "generate_image",
                                                 "update_asset_image"))
                                 .systemPrompt(loadPrompt("asset-image-executor.system.md"))
+                                .instructionTemplate("")
+                                .enableTools(1)
+                                .build());
+        }
+
+        /**
+         * 注册分镜首尾帧生成主 Agent
+         * <p>
+         * 负责读取前端指定的镜头、帧类型和提示词，并按镜头维度分发子 Agent。
+         */
+        private void registerStoryboardFrameGenAgent() {
+                register(AiAgentDefinition.builder()
+                                .type("storyboard_frame_gen")
+                                .name("分镜首尾帧生成")
+                                .toolNames(List.of(
+                                                "get_project", "get_storyboard", "get_storyboard_scene_items"))
+                                .subAgentTools(List.of(
+                                                AiAgentDefinition.SubAgentToolDef.builder()
+                                                                .toolName("generate_storyboard_frame")
+                                                                .displayName("为镜头生成首尾帧")
+                                                                .description("""
+                                                                                为单个分镜镜头生成首帧或尾帧图片并自动保存。每次调用只处理一个镜头的一个帧，可在同一轮同时调用多个实例并行执行。
+
+                                                                                调用时 message 必须包含以下信息（每行一个键值对）：
+                                                                                - storyboardItemId: 分镜条目ID（数字，必传）
+                                                                                - projectId: 项目ID（数字，必传）
+                                                                                - frameType: 帧类型，first 或 last（必传）
+                                                                                - framePrompt: 用户确认后的首尾帧提示词（必传）
+                                                                                - 不要额外传 session_id，框架会自动维护会话
+
+                                                                                message 格式示例：
+                                                                                请为分镜镜头生成首尾帧。
+                                                                                storyboardItemId: 42
+                                                                                projectId: 5
+                                                                                frameType: first
+                                                                                framePrompt: 生成该镜头视频的首帧定格图……""")
+                                                                .refAgentType("storyboard_frame_executor")
+                                                                .build()))
+                                .systemPrompt(loadPrompt("storyboard-frame-gen.system.md"))
+                                .instructionTemplate("""
+                                                <task_context>
+                                                <project_id>{projectId}</project_id>
+                                                <storyboard_id>{storyboardId}</storyboard_id>
+                                                <frame_type>{frameType}</frame_type>
+                                                <frame_prompt>{framePrompt}</frame_prompt>
+                                                </task_context>""")
+                                .defaultUserMessage("请为项目 {projectId} 的分镜镜头生成首尾帧。")
+                                .enableTools(1)
+                                .build());
+        }
+
+        /**
+         * 注册分镜首尾帧生成执行子 Agent
+         * <p>
+         * 每个实例只处理一个镜头的一个帧，自主完成查上下文、生图、回填全流程。
+         */
+        private void registerStoryboardFrameExecutorAgent() {
+                register(AiAgentDefinition.builder()
+                                .type("storyboard_frame_executor")
+                                .name("分镜首尾帧生成执行器")
+                                .toolNames(List.of(
+                                                "get_project", "get_storyboard_scene_items",
+                                                "get_generation_model_capabilities", "generate_image",
+                                                "update_storyboard_item_frame"))
+                                .systemPrompt(loadPrompt("storyboard-frame-executor.system.md"))
                                 .instructionTemplate("")
                                 .enableTools(1)
                                 .build());

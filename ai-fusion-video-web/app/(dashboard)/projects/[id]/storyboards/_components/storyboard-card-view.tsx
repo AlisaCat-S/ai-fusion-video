@@ -5,7 +5,7 @@ import { Film, Plus, Clock, Camera, Image as ImageIcon, GripHorizontal, Video, P
 import { VideoPreviewDialog } from "@/components/dashboard/video-preview-dialog";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/api/client";
-import type { StoryboardItem } from "@/lib/api/storyboard";
+import type { StoryboardFrameType, StoryboardItem } from "@/lib/api/storyboard";
 import { SafeImage } from "@/components/ui/safe-image";
 import {
   DndContext,
@@ -43,6 +43,7 @@ const CardItemUI = memo(
       isSelected: boolean;
       onSelect?: () => void;
       onVideoGen?: (itemId: number) => void;
+      onOpenFrameDialog?: (item: StoryboardItem, frameType: StoryboardFrameType) => void;
       onPreviewVideo?: (videoUrl: string) => void;
       attributes?: SortableBindings["attributes"];
       listeners?: SortableBindings["listeners"];
@@ -58,6 +59,7 @@ const CardItemUI = memo(
         isSelected,
         onSelect,
         onVideoGen,
+        onOpenFrameDialog,
         onPreviewVideo,
         attributes,
         listeners,
@@ -68,7 +70,7 @@ const CardItemUI = memo(
       ref
     ) => {
       const hasImage =
-        item.imageUrl || item.referenceImageUrl || item.generatedImageUrl;
+        item.firstFrameImageUrl || item.imageUrl || item.referenceImageUrl || item.generatedImageUrl;
       const hasVideo = item.generatedVideoUrl || item.videoUrl;
       const hasBoth = hasImage && hasVideo;
 
@@ -79,7 +81,7 @@ const CardItemUI = memo(
 
       const rawVideoUrl = (item.generatedVideoUrl || item.videoUrl || "") as string;
       const videoSrc = resolveMediaUrl(item.generatedVideoUrl || item.videoUrl) || "";
-      const imageSrc = (item.generatedImageUrl || item.imageUrl || item.referenceImageUrl) as string;
+      const imageSrc = (item.firstFrameImageUrl || item.generatedImageUrl || item.imageUrl || item.referenceImageUrl) as string;
 
       return (
         <div
@@ -206,6 +208,44 @@ const CardItemUI = memo(
               </div>
             )}
 
+            {/* 首尾帧入口 - 每个镜头独立设置 */}
+            {onOpenFrameDialog && (
+              <div
+                className="absolute bottom-2 left-2 flex items-center gap-1 z-20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["first", "last"] as StoryboardFrameType[]).map((frameType) => {
+                  const label = frameType === "first" ? "首" : "尾";
+                  const title = frameType === "first" ? "首帧参考图" : "尾帧参考图";
+                  const hasFrame =
+                    frameType === "first"
+                      ? !!item.firstFrameImageUrl
+                      : !!item.lastFrameImageUrl;
+                  return (
+                    <button
+                      key={frameType}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect?.();
+                        onOpenFrameDialog(item, frameType);
+                      }}
+                      className={cn(
+                        "h-7 w-7 rounded-md border text-[10px] font-semibold backdrop-blur-sm transition-all",
+                        "flex items-center justify-center shadow-sm",
+                        hasFrame
+                          ? "border-emerald-400/50 bg-emerald-500/80 text-white"
+                          : "border-white/20 bg-black/45 text-white/80 hover:bg-primary/70 hover:text-white"
+                      )}
+                      title={`${title}：${hasFrame ? "已设置" : "未设置"}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* 生成视频按钮 - 右下角悬浮（只在图片模式或没有切换 tab 时显示） */}
             {onVideoGen && !hasBoth && (
               <button
@@ -281,6 +321,7 @@ function SortableCardItem({
   isSelected,
   onSelect,
   onVideoGen,
+  onOpenFrameDialog,
   onPreviewVideo,
 }: {
   item: StoryboardItem;
@@ -288,6 +329,7 @@ function SortableCardItem({
   isSelected: boolean;
   onSelect: () => void;
   onVideoGen?: (itemId: number) => void;
+  onOpenFrameDialog?: (item: StoryboardItem, frameType: StoryboardFrameType) => void;
   onPreviewVideo?: (videoUrl: string) => void;
 }) {
   const {
@@ -313,6 +355,7 @@ function SortableCardItem({
       isSelected={isSelected}
       onSelect={onSelect}
       onVideoGen={onVideoGen}
+      onOpenFrameDialog={onOpenFrameDialog}
       onPreviewVideo={onPreviewVideo}
       attributes={attributes}
       listeners={listeners}
@@ -328,6 +371,7 @@ export function StoryboardCardView({
   onAddItem,
   onReorderItems,
   onVideoGen,
+  onOpenFrameDialog,
 }: {
   items: StoryboardItem[];
   selectedItemId: number | null;
@@ -335,6 +379,7 @@ export function StoryboardCardView({
   onAddItem: () => void;
   onReorderItems?: (reordered: StoryboardItem[]) => void;
   onVideoGen?: (itemId: number) => void;
+  onOpenFrameDialog?: (item: StoryboardItem, frameType: StoryboardFrameType) => void;
 }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
@@ -416,6 +461,7 @@ export function StoryboardCardView({
                 isSelected={selectedItemId === item.id}
                 onSelect={() => onSelectItem(item.id)}
                 onVideoGen={onVideoGen}
+                onOpenFrameDialog={onOpenFrameDialog}
                 onPreviewVideo={setPreviewVideoUrl}
               />
             ))}

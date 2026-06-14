@@ -26,6 +26,7 @@ import {
   storyboardApi,
   type Storyboard,
   type StoryboardEpisode,
+  type StoryboardFrameType,
   type StoryboardItem,
   type StoryboardScene,
 } from "@/lib/api/storyboard";
@@ -33,6 +34,7 @@ import { StoryboardSidebar } from "./_components/storyboard-sidebar";
 import { StoryboardTableView } from "./_components/storyboard-table-view";
 import { StoryboardCardView } from "./_components/storyboard-card-view";
 import { StoryboardRefPanel } from "./_components/storyboard-ref-panel";
+import { StoryboardFrameReferenceDialog } from "./_components/storyboard-frame-reference-dialog";
 import { CreateStoryboardDialog } from "./_components/create-dialog";
 import { EditItemAssetsDialog } from "./_components/edit-assets-dialog";
 import { assetApi } from "@/lib/api/asset";
@@ -40,6 +42,8 @@ import { useFullWidth } from "@/lib/hooks/use-layout";
 import { useProject } from "../project-context";
 
 type ViewMode = "table" | "card";
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "fusion-storyboard-sidebar-collapsed";
 
 interface SidebarSelection {
   type: "all" | "episode" | "scene";
@@ -103,6 +107,7 @@ export default function StoryboardTabPage() {
 
   // 视图状态
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // 加载本地用户偏好
   useEffect(() => {
@@ -110,13 +115,26 @@ export default function StoryboardTabPage() {
     if (savedMode === "table" || savedMode === "card") {
       setViewMode(savedMode);
     }
+    setIsSidebarCollapsed(
+      localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
+    );
   }, []);
 
   const handleSetViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
     localStorage.setItem("fusion-storyboard-view-mode", mode);
   }, []);
+  const handleSetSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setIsSidebarCollapsed(collapsed);
+    localStorage.setItem(
+      SIDEBAR_COLLAPSED_STORAGE_KEY,
+      collapsed ? "true" : "false"
+    );
+  }, []);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [frameDialogItemId, setFrameDialogItemId] = useState<number | null>(null);
+  const [frameDialogInitialType, setFrameDialogInitialType] =
+    useState<StoryboardFrameType>("first");
   const [sidebarSelection, setSidebarSelection] = useState<SidebarSelection>({
     type: "episode",
   });
@@ -578,6 +596,7 @@ export default function StoryboardTabPage() {
         }))
       );
       if (selectedItemId === itemId) setSelectedItemId(null);
+      if (frameDialogItemId === itemId) setFrameDialogItemId(null);
     } catch (err) {
       console.error("删除条目失败:", err);
     }
@@ -586,7 +605,7 @@ export default function StoryboardTabPage() {
   const handleUpdateItemField = async (
     itemId: number,
     field: string,
-    value: string
+    value: string | number | null
   ) => {
     try {
       const updated = await storyboardApi.updateItem({
@@ -603,6 +622,95 @@ export default function StoryboardTabPage() {
       console.error("更新条目失败:", err);
     }
   };
+
+  const updateItemInSceneGroups = useCallback((updated: StoryboardItem) => {
+    setSceneGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        items: g.items.map((i) => (i.id === updated.id ? updated : i)),
+      }))
+    );
+  }, []);
+
+  /** 手动更新镜头首尾帧 */
+  const handleUpdateItemFrame = useCallback(
+    async (itemId: number, frameType: StoryboardFrameType, imageUrl: string | null) => {
+      try {
+        const updated = await storyboardApi.updateFrame(itemId, {
+          frameType,
+          imageUrl,
+          prompt: null,
+        });
+        updateItemInSceneGroups(updated);
+      } catch (err) {
+        console.error("更新镜头首尾帧失败:", err);
+        throw err;
+      }
+    },
+    [updateItemInSceneGroups]
+  );
+
+  /** 提交镜头首尾帧 AI 生成任务 */
+  const handleGenerateItemFrame = useCallback(
+    async (item: StoryboardItem, frameType: StoryboardFrameType, prompt: string) => {
+      if (!storyboard) {
+        throw new Error("缺少分镜上下文，无法生成首尾帧");
+      }
+      const frameLabel = frameType === "first" ? "首帧" : "尾帧";
+      const shotLabel = item.shotNumber || item.autoShotNumber || String(item.id);
+      try {
+        setNotificationOpen(true);
+        const pipelineId = addPipeline({
+          label: `生成镜头 ${shotLabel} ${frameLabel}`,
+          projectId,
+          request: {
+            agentType: "storyboard_frame_gen",
+            category: "pipeline",
+            title: `生成镜头 ${shotLabel} ${frameLabel}`,
+            projectId,
+            context: {
+              selectedStoryboardItemIds: [item.id],
+              storyboardId: storyboard.id,
+              frameType,
+              framePrompt: prompt,
+            },
+          },
+          onComplete: () => {
+            void refreshStoryboardData();
+          },
+        });
+        setPanelExpanded(true);
+        setExpandedTaskId(pipelineId);
+      } catch (err) {
+        console.error("提交镜头首尾帧生成任务失败:", err);
+        throw err;
+      }
+    },
+    [
+      addPipeline,
+      projectId,
+      refreshStoryboardData,
+      setExpandedTaskId,
+      setNotificationOpen,
+      setPanelExpanded,
+      storyboard,
+    ]
+  );
+
+  /** 打开单个镜头首尾帧编辑弹窗 */
+  const handleOpenFrameDialog = useCallback(
+    (item: StoryboardItem, frameType: StoryboardFrameType) => {
+      setSelectedItemId(item.id);
+      setFrameDialogItemId(item.id);
+      setFrameDialogInitialType(frameType);
+    },
+    []
+  );
+
+  /** 关闭单个镜头首尾帧编辑弹窗 */
+  const handleCloseFrameDialog = useCallback(() => {
+    setFrameDialogItemId(null);
+  }, []);
 
   // 拖拽排序
   const handleReorderItems = async (
@@ -722,6 +830,9 @@ export default function StoryboardTabPage() {
   const selectedItem = selectedItemId
     ? allItems.find((i) => i.id === selectedItemId) || null
     : null;
+  const frameDialogItem = frameDialogItemId
+    ? allItems.find((i) => i.id === frameDialogItemId) || null
+    : null;
 
   // 当前激活场次的分组（用于右侧面板展示场次资产）
   const activeSceneGroup = activeSceneId
@@ -808,7 +919,9 @@ export default function StoryboardTabPage() {
         storyboardId={storyboard.id}
         selection={sidebarSelection}
         activeSceneId={activeSceneId}
+        collapsed={isSidebarCollapsed}
         onSelect={setSidebarSelection}
+        onCollapsedChange={handleSetSidebarCollapsed}
         onInitialLoad={handleSidebarInitialLoad}
         onDeleteEpisode={handleDeleteEpisode}
         onDeleteScene={handleDeleteScene}
@@ -994,12 +1107,14 @@ export default function StoryboardTabPage() {
                   selectedItem={selectedItem}
                   activeSceneGroup={activeSceneGroup}
                   projectId={projectId}
+                  project={project}
                   assetLookup={assetLookup}
+                  onUpdateFrame={handleUpdateItemFrame}
+                  onGenerateFrame={handleGenerateItemFrame}
                   onEditAssets={(item) => {
                     setEditingItem(item);
                     setEditAssetsOpen(true);
                   }}
-                  hideShotDetails={viewMode === "table"}
                 />
               </SheetContent>
             </Sheet>
@@ -1081,6 +1196,7 @@ export default function StoryboardTabPage() {
                       handleReorderItems(scene.id, reordered)
                     }
                     onVideoGen={handleVideoGen}
+                    onOpenFrameDialog={handleOpenFrameDialog}
                     assetLookup={assetLookup}
                     onEditAssets={(item) => {
                       setEditingItem(item);
@@ -1099,6 +1215,7 @@ export default function StoryboardTabPage() {
                       handleReorderItems(scene.id, reordered)
                     }
                     onVideoGen={handleVideoGen}
+                    onOpenFrameDialog={handleOpenFrameDialog}
                   />
                 )}
               </div>
@@ -1115,12 +1232,14 @@ export default function StoryboardTabPage() {
         selectedItem={selectedItem}
         activeSceneGroup={activeSceneGroup}
         projectId={projectId}
+        project={project}
         assetLookup={assetLookup}
+        onUpdateFrame={handleUpdateItemFrame}
+        onGenerateFrame={handleGenerateItemFrame}
         onEditAssets={(item) => {
           setEditingItem(item);
           setEditAssetsOpen(true);
         }}
-        hideShotDetails={viewMode === "table"}
       />
       </motion.div>
 
@@ -1129,6 +1248,17 @@ export default function StoryboardTabPage() {
         title="本集合成视频"
         videoUrl={composedPreviewUrl}
         onClose={() => setComposedPreviewUrl(null)}
+      />
+
+      <StoryboardFrameReferenceDialog
+        key={`${frameDialogItemId ?? "closed"}-${frameDialogInitialType}`}
+        open={frameDialogItemId !== null}
+        item={frameDialogItem}
+        project={project}
+        initialFrameType={frameDialogInitialType}
+        onClose={handleCloseFrameDialog}
+        onUpdateFrame={handleUpdateItemFrame}
+        onGenerateFrame={handleGenerateItemFrame}
       />
 
       <EditItemAssetsDialog

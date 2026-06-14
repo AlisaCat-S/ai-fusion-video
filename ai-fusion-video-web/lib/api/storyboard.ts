@@ -68,6 +68,10 @@ export interface StoryboardItem {
   referenceImageUrl: string | null;
   videoUrl: string | null;
   generatedImageUrl: string | null;
+  firstFrameImageUrl: string | null;
+  lastFrameImageUrl: string | null;
+  firstFramePrompt: string | null;
+  lastFramePrompt: string | null;
   generatedVideoUrl: string | null;
   videoPrompt: string | null;
   shotType: string | null;
@@ -170,6 +174,10 @@ export interface StoryboardItemCreateReq {
   transition?: string;
   duration?: number;
   sortOrder?: number;
+  firstFrameImageUrl?: string | null;
+  lastFrameImageUrl?: string | null;
+  firstFramePrompt?: string | null;
+  lastFramePrompt?: string | null;
   characterIds?: string | null;
   sceneAssetItemId?: number | null;
   propIds?: string | null;
@@ -191,11 +199,25 @@ export interface StoryboardItemUpdateReq {
   duration?: number;
   sortOrder?: number;
   imageUrl?: string;
+  firstFrameImageUrl?: string | null;
+  lastFrameImageUrl?: string | null;
+  firstFramePrompt?: string | null;
+  lastFramePrompt?: string | null;
   videoPrompt?: string | null;
   status?: number;
   characterIds?: string | null;
   sceneAssetItemId?: number | null;
   propIds?: string | null;
+}
+
+/** 分镜首尾帧类型 */
+export type StoryboardFrameType = "first" | "last";
+
+/** 更新分镜首尾帧请求 */
+export interface StoryboardFrameUpdateReq {
+  frameType: StoryboardFrameType;
+  imageUrl?: string | null;
+  prompt?: string | null;
 }
 
 // ========== API ==========
@@ -294,6 +316,10 @@ export const storyboardApi = {
   /** 更新分镜条目 */
   updateItem: (data: StoryboardItemUpdateReq) =>
     http.put<never, StoryboardItem>("/api/storyboard/item", data),
+
+  /** 更新分镜条目首尾帧 */
+  updateFrame: (id: number, data: StoryboardFrameUpdateReq) =>
+    http.put<never, StoryboardItem>(`/api/storyboard/item/${id}/updateFrame`, data),
 
   /** 删除分镜条目 */
   deleteItem: (id: number) =>

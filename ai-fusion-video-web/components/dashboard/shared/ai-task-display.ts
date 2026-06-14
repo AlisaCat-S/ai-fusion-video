@@ -31,12 +31,14 @@ export const toolDisplayNames: Record<string, string> = {
   generate_image: "AI 生成图片",
   generate_video: "AI 生成视频",
   update_storyboard_item_video: "更新分镜视频",
+  update_storyboard_item_frame: "更新分镜首尾帧",
   get_storyboard_scene_items: "查询场次镜头列表",
   episode_scene_writer: "分集场次解析（子Agent）",
   episode_script_creator: "分集剧本创作（子Agent）",
   episode_storyboard_writer: "分集分镜编写（子Agent）",
   storyboard_asset_preprocessor: "子资产预处理（子Agent）",
   generate_asset_image: "生成资产图片（子Agent）",
+  generate_storyboard_frame: "生成分镜首尾帧（子Agent）",
   generate_storyboard_video: "生成分镜视频（子Agent）",
 };
 
@@ -46,6 +48,7 @@ export const subAgentToolNames = [
   "episode_storyboard_writer",
   "storyboard_asset_preprocessor",
   "generate_asset_image",
+  "generate_storyboard_frame",
   "generate_storyboard_video",
 ];
 
@@ -60,6 +63,8 @@ export const agentTypeNames: Record<string, string> = {
   storyboard_asset_preprocessor: "子资产预处理",
   asset_image_gen: "资产图片生成",
   asset_image_executor: "资产图片执行",
+  storyboard_frame_gen: "分镜首尾帧生成",
+  storyboard_frame_executor: "分镜首尾帧执行",
   storyboard_video_gen: "分镜视频生成",
   storyboard_video_executor: "分镜视频执行",
   storyboard_episode_compose: "分集合成视频",

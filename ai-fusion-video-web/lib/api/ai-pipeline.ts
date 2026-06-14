@@ -30,6 +30,8 @@ export const PIPELINE_AGENT_TYPES = [
   "storyboard_asset_preprocessor",
   "asset_image_gen",
   "asset_image_executor",
+  "storyboard_frame_gen",
+  "storyboard_frame_executor",
   "storyboard_video_gen",
   "storyboard_video_executor",
 ] as const;
