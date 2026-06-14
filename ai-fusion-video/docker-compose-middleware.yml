@@ -17,7 +17,7 @@ services:
       - mysql_data:/var/lib/mysql
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.6
     container_name: ai-fusion-video-redis
     restart: unless-stopped
     ports:
